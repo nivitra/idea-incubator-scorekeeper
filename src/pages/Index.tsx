@@ -114,8 +114,10 @@ const INITIAL_USERS = [
   },
 ];
 
+const DEFAULT_LEADER_PASSWORD = "leader@mgit"; // for demo only! Change for security.
+
 const Index = () => {
-  // --- Settings State ---
+  // --- State ---
   const [globalThreshold, setGlobalThreshold] = useState(DEFAULT_MIN_CREDITS);
   const [buffer, setBuffer] = useState(DEFAULT_WARN_BUFFER);
   const [users, setUsers] = useState(INITIAL_USERS);
@@ -123,6 +125,15 @@ const Index = () => {
   const [thresholdConfigVisible, setThresholdConfigVisible] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const branding = useClubBranding();
+
+  // Password management (demo only: store in-memory for user sessions)
+  const [userPasswords, setUserPasswords] = useState<{ [email: string]: { password: string, role: string } }>({
+    "priya@mgit.ac.in": { password: DEFAULT_LEADER_PASSWORD, role: "leader" },
+    "aman@mgit.ac.in": { password: "member123", role: "member" },
+    "saina@mgit.ac.in": { password: "member123", role: "member" },
+  });
+  // Track reset requests: { email: "pending" | "approved" | "rejected" }
+  const [resetRequests, setResetRequests] = useState<{ [email: string]: string }>({});
 
   // Listen for profile updates
   React.useEffect(() => {
@@ -308,18 +319,48 @@ const Index = () => {
   }, [users.length, globalThreshold, buffer]);
 
   // ----- Signup & authentication -----
-  const handleLogin = (u: { name: string; email: string; role: string; avatarUrl?: string; position?: string }) => {
-    // Try to find the user, else create with in-review approval
-    let match = users.find(
-      (user) => user.email.toLowerCase() === u.email.toLowerCase()
-    );
-    let role = u.role;
-    if (!match) {
-      match = {
+  const [loginError, setLoginError] = useState<string | undefined>(undefined);
+  const [loginMode, setLoginMode] = useState<"signIn" | "signUp">("signIn");
+  const [resetPendingCaller, setResetPendingCaller] = useState<string | null>(null);
+
+  const handleLogin = (u: {
+    name: string;
+    email: string;
+    role: string;
+    password: string;
+    avatarUrl?: string;
+    position?: string;
+    mode?: "signIn" | "signUp";
+    passwordResetRequest?: boolean;
+  }) => {
+    setLoginError(undefined);
+    const email = u.email.toLowerCase();
+    // Sign Up Flow
+    if (u.mode === "signUp") {
+      // Prevent choosing leader without leader password
+      if (
+        u.role === "leader" &&
+        userPasswords[email]?.role !== "leader" &&
+        u.password !== DEFAULT_LEADER_PASSWORD
+      ) {
+        setLoginError("Leader sign-up is protected. Incorrect leader password.");
+        return;
+      }
+      if (userPasswords[email]) {
+        setLoginError("Account already exists. Please sign in.");
+        return;
+      }
+      // Save "password" in demo-local memory (DON'T DO IN PRODUCTION)
+      setUserPasswords(prev => ({
+        ...prev,
+        [email]: { password: u.password, role: u.role }
+      }));
+      // Add to users list with approval if needed
+      let newUser = {
         id: "u" + (users.length + 1),
         name: u.name,
-        email: u.email,
-        role: role,
+        email,
+        role: u.role,
         credits: 12,
         status: "active",
         joinDate: new Date().toISOString().slice(0, 10),
@@ -340,7 +381,52 @@ const Index = () => {
           },
         ],
       };
-      setUsers((prev) => [...prev, match!]);
+      setUsers((prev) => [...prev, newUser]);
+      setCurrentUser({
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+      });
+      return;
+    }
+    // Sign In Flow
+    if (!userPasswords[email]) {
+      setLoginError("No account found with this email. Please sign up.");
+      return;
+    }
+    if (userPasswords[email].password !== u.password) {
+      // If reset requested & it was approved, allow setting a new password
+      if (
+        resetRequests[email] === "approved" &&
+        u.password.length >= 6
+      ) {
+        setUserPasswords(prev => ({
+          ...prev,
+          [email]: { ...prev[email], password: u.password }
+        }));
+        setResetRequests(prev => ({
+          ...prev,
+          [email]: undefined
+        }));
+      } else {
+        setLoginError("Incorrect password.");
+        return;
+      }
+    }
+    // Prevent users logging in as leader without leader credentials
+    if (
+      u.role === "leader" &&
+      userPasswords[email].role !== "leader"
+    ) {
+      setLoginError("This account is not a leader account.");
+      return;
+    }
+    // Find the user in users array
+    let match = users.find(user => user.email.toLowerCase() === email);
+    if (!match) {
+      setLoginError("Account data missing. Please sign up again.");
+      return;
     }
     setCurrentUser({
       id: match.id,
@@ -350,8 +436,33 @@ const Index = () => {
     });
   };
 
+  // Password Reset Request Handler
+  const handlePasswordResetRequest = (email: string) => {
+    if (!userPasswords[email]) return;
+    setResetRequests(prev => ({
+      ...prev,
+      [email]: "pending"
+    }));
+    setResetPendingCaller(email);
+  };
+
+  // Logout resets session
   const handleLogout = () => {
     setCurrentUser(null);
+  };
+
+  // Leader approves/rejects reset requests
+  const handleApproveReset = (email: string) => {
+    setResetRequests(prev => ({
+      ...prev,
+      [email]: "approved"
+    }));
+  };
+  const handleRejectReset = (email: string) => {
+    setResetRequests(prev => ({
+      ...prev,
+      [email]: "rejected"
+    }));
   };
 
   // ---------- Manual activation/deactivation from leader -----------
@@ -390,6 +501,9 @@ const Index = () => {
   // ===================== ENTRY POINT ====================
   // Not logged in
   if (!currentUser) {
+    // Determine if current login attempt is for leader
+    const lastAttemptLeader =
+      loginMode === "signUp" ? false : undefined;
     return (
       <div className="min-h-screen flex justify-center items-center bg-gradient-to-tr from-blue-50 to-emerald-100 relative">
         {/* Banner and logo */}
@@ -405,11 +519,30 @@ const Index = () => {
             alt={branding.club_name}
             className="w-28 h-28 rounded-full mb-4 border-4 border-white shadow bg-white"
           />
-          <div className="text-3xl md:text-4xl font-extrabold text-primary mb-2" style={branding.accent_color ? { color: branding.accent_color } : {}}>
+          <div
+            className="text-3xl md:text-4xl font-extrabold text-primary mb-2"
+            style={branding.accent_color ? { color: branding.accent_color } : {}}
+          >
             {branding.club_name}
           </div>
-          <div className="text-lg mb-6 text-muted-foreground">Welcome to our club's credit portal!</div>
-          <LoginForm onLogin={handleLogin} showRoleOption requireExtraFields />
+          <div className="text-lg mb-6 text-muted-foreground">
+            Welcome to our club's credit portal!
+          </div>
+          <LoginForm
+            onLogin={handleLogin}
+            showRoleOption
+            requireExtraFields
+            leaderAuthRequired
+            leaderPassword={DEFAULT_LEADER_PASSWORD}
+            passwordResetPending={
+              !!(resetPendingCaller && resetRequests[resetPendingCaller] === "pending")
+            }
+            onPasswordResetRequest={handlePasswordResetRequest}
+            error={loginError}
+          />
+          {loginError && (
+            <div className="text-red-500 text-xs mt-2">{loginError}</div>
+          )}
         </div>
       </div>
     );
@@ -442,6 +575,46 @@ const Index = () => {
             ) : (
               <div className="text-sm">No users pending approval.</div>
             )}
+            {/* Password reset approvals for leader */}
+            <div className="mt-6">
+              <div className="font-semibold text-base mb-2">
+                Password Reset Requests
+              </div>
+              {Object.entries(resetRequests)
+                .filter(([_email, status]) => status === "pending")
+                .length === 0 ? (
+                <div className="text-sm text-muted-foreground">
+                  No pending reset requests.
+                </div>
+              ) : (
+                Object.entries(resetRequests)
+                  .filter(([_email, status]) => status === "pending")
+                  .map(([email, _status]) => (
+                    <div
+                      key={email}
+                      className="flex items-center justify-between mb-2"
+                    >
+                      <span className="text-sm">{email}</span>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => handleApproveReset(email)}
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleRejectReset(email)}
+                        >
+                          Reject
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
             <Button className="mt-6 w-full" onClick={handleLogout}>Logout</Button>
           </div>
         </div>
@@ -484,7 +657,14 @@ const Index = () => {
             alt={branding.club_name}
             className="w-10 h-10 rounded-full border border-primary"
           />
-          <span className="text-2xl font-bold" style={branding.accent_color ? { color: branding.accent_color } : {}}>
+          <span
+            className="text-2xl font-bold"
+            style={
+              branding.accent_color
+                ? { color: branding.accent_color }
+                : {}
+            }
+          >
             {branding.club_name}
           </span>
         </header>
@@ -537,5 +717,5 @@ const Index = () => {
 
 export default Index;
 
-// NOTE: This file is now quite long (~400 lines).
+// NOTE: This file is now quite long (~600 lines).
 // ⚡️ Consider refactoring it into smaller files for maintainability!
