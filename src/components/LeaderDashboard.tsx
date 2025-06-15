@@ -1,10 +1,11 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import UserListTable from "./UserListTable";
 import CreditHistoryTable from "./CreditHistoryTable";
 import AddCreditForm from "./AddCreditForm";
 import { Button } from "@/components/ui/button";
 import { LogIn } from "lucide-react";
+import UserProfileModal from "./UserProfileModal";
+import { user as UserIcon } from "lucide-react";
 
 // user type
 type User = {
@@ -21,6 +22,7 @@ type User = {
     reason: string;
     by: string;
   }[];
+  avatarUrl: string;
 };
 
 interface LeaderDashboardProps {
@@ -79,31 +81,42 @@ const LeaderDashboard: React.FC<LeaderDashboardProps> = ({
     }
   }, [filteredUsers, selectedUserId]);
 
+  const [profileOpen, setProfileOpen] = React.useState(false);
+  const [localLeader, setLocalLeader] = React.useState(currentLeader);
+
+  React.useEffect(() => {
+    setLocalLeader(currentLeader);
+  }, [currentLeader]);
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-blue-50 to-emerald-50 px-2 py-6">
       <div className="flex flex-col md:flex-row items-center justify-between gap-6 border-b pb-4 mb-8">
         <div className="flex gap-4 items-center">
           <div className="rounded-full border-2 border-primary/80 p-1 bg-white shadow">
             <img
-              src={`https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(
-                currentLeader.email
-              )}`}
-              alt={currentLeader.name}
+              src={localLeader.avatarUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(localLeader.email)}`}
+              alt={localLeader.name}
               className="w-14 h-14 rounded-full object-cover"
             />
           </div>
           <div>
-            <h2 className="text-2xl font-bold mb-0">{currentLeader.name}</h2>
+            <h2 className="text-2xl font-bold mb-0">{localLeader.name}</h2>
             <div className="text-muted-foreground text-sm">
-              {currentLeader.email} <span className="mx-1">&mdash;</span>{" "}
+              {localLeader.email} <span className="mx-1">&mdash;</span>{" "}
               <span className="font-semibold text-blue-700">Leader/Manager</span>
             </div>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={onLogout}>
-          <LogIn className="mr-1" size={16} />
-          Log out
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setProfileOpen(true)}>
+            <UserIcon className="mr-1" size={16} />
+            Profile
+          </Button>
+          <Button variant="outline" size="sm" onClick={onLogout}>
+            <LogIn className="mr-1" size={16} />
+            Log out
+          </Button>
+        </div>
       </div>
 
       <div className="bg-white shadow-md rounded-xl p-6 mb-10">
@@ -191,6 +204,17 @@ const LeaderDashboard: React.FC<LeaderDashboardProps> = ({
           </div>
         </div>
       )}
+
+      <UserProfileModal
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        user={localLeader}
+        onUpdate={(val) => {
+          setProfileOpen(false);
+          setLocalLeader(prev => ({ ...prev, ...val }));
+          window.dispatchEvent(new CustomEvent("user-profile-updated", { detail: val }));
+        }}
+      />
     </div>
   );
 };

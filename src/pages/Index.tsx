@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import LoginForm from "../components/LoginForm";
 import LeaderDashboard from "../components/LeaderDashboard";
 import MemberDashboard from "../components/MemberDashboard";
@@ -83,6 +82,28 @@ const INITIAL_USERS = [
 const Index = () => {
   const [users, setUsers] = useState(INITIAL_USERS);
   const [currentUser, setCurrentUser] = useState<null | { id: string; name: string; email: string; role: string }>(null);
+
+  // Listen for profile updates
+  React.useEffect(() => {
+    const handleProfileUpdate = (e: any) => {
+      const { name, avatarUrl } = e.detail;
+      setUsers(prev =>
+        prev.map(u =>
+          currentUser && u.id === currentUser.id
+            ? { ...u, name, avatarUrl }
+            : u
+        )
+      );
+      if (currentUser) {
+        setCurrentUser({ ...currentUser, name });
+      }
+    };
+    window.addEventListener("user-profile-updated", handleProfileUpdate);
+    return () => {
+      window.removeEventListener("user-profile-updated", handleProfileUpdate);
+    };
+    // eslint-disable-next-line
+  }, [currentUser]);
 
   // Simulate authentication (no real security!)
   const handleLogin = (u: { name: string; email: string; role: string }) => {
