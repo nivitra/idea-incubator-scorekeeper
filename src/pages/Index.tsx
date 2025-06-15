@@ -5,6 +5,8 @@ import MemberDashboard from "../components/MemberDashboard";
 import ThresholdConfigPanel from "../components/ThresholdConfigPanel";
 import { ThresholdAnalyticsPanel } from "../components/ThresholdAnalyticsPanel";
 import { Button } from "@/components/ui/button";
+import { useClubBranding } from "@/context/ClubBrandingContext";
+import BrandingAdminPanel from "../components/BrandingAdminPanel";
 
 // -------------------
 // Version 3 constants
@@ -120,6 +122,7 @@ const Index = () => {
   const [currentUser, setCurrentUser] = useState<null | { id: string; name: string; email: string; role: string }>(null);
   const [thresholdConfigVisible, setThresholdConfigVisible] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const branding = useClubBranding();
 
   // Listen for profile updates
   React.useEffect(() => {
@@ -388,8 +391,26 @@ const Index = () => {
   // Not logged in
   if (!currentUser) {
     return (
-      <div className="min-h-screen flex justify-center items-center bg-gradient-to-tr from-blue-50 to-emerald-100">
-        <LoginForm onLogin={handleLogin} showRoleOption requireExtraFields />
+      <div className="min-h-screen flex justify-center items-center bg-gradient-to-tr from-blue-50 to-emerald-100 relative">
+        {/* Banner and logo */}
+        <img
+          src={branding.home_banner_image}
+          alt="Club Banner"
+          className="absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none z-0"
+          style={{ minHeight: 340, objectPosition: "center" }}
+        />
+        <div className="relative z-10 flex flex-col items-center">
+          <img
+            src={branding.club_logo}
+            alt={branding.club_name}
+            className="w-28 h-28 rounded-full mb-4 border-4 border-white shadow bg-white"
+          />
+          <div className="text-3xl md:text-4xl font-extrabold text-primary mb-2" style={branding.accent_color ? { color: branding.accent_color } : {}}>
+            {branding.club_name}
+          </div>
+          <div className="text-lg mb-6 text-muted-foreground">Welcome to our club's credit portal!</div>
+          <LoginForm onLogin={handleLogin} showRoleOption requireExtraFields />
+        </div>
       </div>
     );
   }
@@ -455,6 +476,20 @@ const Index = () => {
   // Leader dashboard
   return (
     <>
+      <div className="w-full px-2">
+        {/* Dynamic club header for leader */}
+        <header className="flex items-center gap-3 py-3 mb-4 border-b max-w-6xl mx-auto">
+          <img
+            src={branding.club_logo}
+            alt={branding.club_name}
+            className="w-10 h-10 rounded-full border border-primary"
+          />
+          <span className="text-2xl font-bold" style={branding.accent_color ? { color: branding.accent_color } : {}}>
+            {branding.club_name}
+          </span>
+          <span className="ml-auto text-xs text-muted-foreground">Powered by Scorekeeper</span>
+        </header>
+      </div>
       <LeaderDashboard
         users={users}
         currentLeader={user}
@@ -495,6 +530,8 @@ const Index = () => {
           status: u.status === "disabled" ? "disabled" : u.softDisabled ? "soft-disabled" : "active"
         }))}
       />
+      {/* Brand panel (stub, only visible for demo) */}
+      <BrandingAdminPanel />
     </>
   );
 };
