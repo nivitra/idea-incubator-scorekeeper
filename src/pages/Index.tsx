@@ -487,7 +487,6 @@ const Index = () => {
           <span className="text-2xl font-bold" style={branding.accent_color ? { color: branding.accent_color } : {}}>
             {branding.club_name}
           </span>
-          <span className="ml-auto text-xs text-muted-foreground">Powered by Scorekeeper</span>
         </header>
       </div>
       <LeaderDashboard
