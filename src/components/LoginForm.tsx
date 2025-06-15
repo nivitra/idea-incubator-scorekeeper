@@ -151,7 +151,8 @@ const LoginForm: React.FC<LoginFormProps> = ({
           ) : (
             <form className="space-y-5" onSubmit={handleLogin}>
               <div className="flex flex-col items-center gap-2">
-                {requireExtraFields && (
+                {/* Only show extra fields if mode is signUp and requireExtraFields is true */}
+                {requireExtraFields && mode === "signUp" && (
                   <>
                     <div className="relative mb-2">
                       <img
@@ -310,3 +311,4 @@ const LoginForm: React.FC<LoginFormProps> = ({
 };
 
 export default LoginForm;
+
