@@ -124,6 +124,7 @@ const Index = () => {
         credits: 12,
         status: "active",
         joinDate: new Date().toISOString().slice(0, 10),
+        avatarUrl: "", // <-- Fix: always include avatarUrl
         history: [
           {
             ts: new Date().toISOString(),
