@@ -1,9 +1,8 @@
-
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Image } from "lucide-react";
+import { Image, Images } from "lucide-react";
 import { Label } from "@/components/ui/label";
 
 interface UserProfileModalProps {
@@ -24,18 +23,47 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ open, onClose, user
   const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl || "");
   const [position, setPosition] = useState(user.position || "");
   const [saving, setSaving] = useState(false);
+  const [avatarFileUrl, setAvatarFileUrl] = useState<string | undefined>(undefined);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     setName(user.name || "");
     setAvatarUrl(user.avatarUrl || "");
     setPosition(user.position || "");
-  }, [user]);
+    setAvatarFileUrl(undefined);
+  }, [user, open]);
+
+  // When both avatarUrl and a selected file are present, show the file first to avoid confusion
+  const avatarPreviewUrl =
+    avatarFileUrl 
+      ? avatarFileUrl
+      : avatarUrl 
+        ? avatarUrl 
+        : `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(user.email)}`;
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith("image/")) {
+      const url = URL.createObjectURL(file);
+      setAvatarFileUrl(url);
+      setAvatarUrl(""); // clear URL input since the file takes precedence
+    }
+  };
+
+  const handleImageGalleryClick = () => {
+    fileInputRef.current?.click();
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setTimeout(() => {
-      onUpdate({ name: name.trim() || "Student", avatarUrl: avatarUrl.trim(), position: position.trim() });
+      // If the user picked a local file, keep its object url in avatarUrl for now (simulate media upload)
+      onUpdate({ 
+        name: name.trim() || "Student", 
+        avatarUrl: avatarFileUrl || avatarUrl.trim(), 
+        position: position.trim(),
+      });
       setSaving(false);
       onClose();
     }, 350);
@@ -52,30 +80,63 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ open, onClose, user
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex flex-col gap-2 items-center">
-            <div className="relative mb-2">
+            <div className="relative mb-2 group">
               <img
-                src={avatarUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(user.email)}`}
+                src={avatarPreviewUrl}
                 alt={name}
                 className="w-16 h-16 rounded-full border object-cover bg-white"
               />
               <label
                 htmlFor="avatar-url"
                 className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 cursor-pointer"
-                title="Change avatar url"
+                title="Edit avatar url"
                 style={{ lineHeight: 0 }}>
                 <Image size={16} />
               </label>
+              <button
+                type="button"
+                className="absolute bottom-0 left-0 bg-background border border-gray-200 text-gray-600 rounded-full p-1 cursor-pointer shadow transition hover:bg-blue-100"
+                title="Add from gallery"
+                onClick={handleImageGalleryClick}
+                tabIndex={-1}
+                style={{ lineHeight: 0 }}
+              >
+                <Images size={16} />
+              </button>
+              <input
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                ref={fileInputRef}
+                onChange={handleFileChange}
+              />
             </div>
             <Input
               id="avatar-url"
               placeholder="Avatar URL (optional)"
               className="w-full"
               value={avatarUrl}
-              onChange={e => setAvatarUrl(e.target.value)}
+              onChange={e => {
+                setAvatarUrl(e.target.value);
+                setAvatarFileUrl(undefined); // clear file image if a url is entered
+              }}
               autoComplete="off"
               maxLength={250}
               disabled={saving}
             />
+            <div className="flex w-full justify-between">
+              <span className="text-xs text-muted-foreground">Paste image URL, or use gallery <Images size={13} className="inline" /></span>
+              {avatarFileUrl && (
+                <button
+                  type="button"
+                  className="text-xs text-blue-600 underline ml-2"
+                  onClick={() => setAvatarFileUrl(undefined)}
+                  tabIndex={-1}
+                >
+                  Remove selected photo
+                </button>
+              )}
+            </div>
           </div>
           <div>
             <Label htmlFor="name-input">Name</Label>
