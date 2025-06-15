@@ -7,6 +7,7 @@ import { ThresholdAnalyticsPanel } from "../components/ThresholdAnalyticsPanel";
 import { Button } from "@/components/ui/button";
 import { useClubBranding } from "@/context/ClubBrandingContext";
 import BrandingAdminPanel from "../components/BrandingAdminPanel";
+import Footer from "../components/Footer";
 
 // -------------------
 // Version 3 constants
@@ -544,13 +545,14 @@ const Index = () => {
             <div className="text-red-500 text-xs mt-2">{loginError}</div>
           )}
         </div>
+        <Footer />
       </div>
     );
   }
 
   // Find user and check approval state
   const user = users.find((u) => u.id === currentUser.id);
-  if (!user) return <div>User not found.</div>;
+  if (!user) return <div>User not found.<Footer /></div>;
   if (APPROVAL_REQUIRED && user.approvalState && user.approvalState !== "approved") {
     // If leader/admin, show approval UI, else pending
     if (currentUser.role === "leader") {
@@ -617,6 +619,7 @@ const Index = () => {
             </div>
             <Button className="mt-6 w-full" onClick={handleLogout}>Logout</Button>
           </div>
+          <Footer />
         </div>
       );
     }
@@ -628,6 +631,7 @@ const Index = () => {
           <div className="text-muted-foreground mb-4">Please wait for a leader/manager to review your request.</div>
           <Button className="w-full" onClick={handleLogout}>Logout</Button>
         </div>
+        <Footer />
       </div>
     );
   }
@@ -635,15 +639,18 @@ const Index = () => {
   // Member dashboard
   if (user.role === "member") {
     return (
-      <MemberDashboard
-        user={user}
-        disabled={user.status !== "active"}
-        minCredits={user.minThreshold !== undefined ? user.minThreshold : globalThreshold}
-        warnBuffer={buffer}
-        globalThreshold={globalThreshold}
-        softDisabled={user.softDisabled}
-        onLogout={handleLogout}
-      />
+      <>
+        <MemberDashboard
+          user={user}
+          disabled={user.status !== "active"}
+          minCredits={user.minThreshold !== undefined ? user.minThreshold : globalThreshold}
+          warnBuffer={buffer}
+          globalThreshold={globalThreshold}
+          softDisabled={user.softDisabled}
+          onLogout={handleLogout}
+        />
+        <Footer />
+      </>
     );
   }
   // Leader dashboard
@@ -711,6 +718,7 @@ const Index = () => {
       />
       {/* Brand panel (stub, only visible for demo) */}
       <BrandingAdminPanel />
+      <Footer />
     </>
   );
 };
