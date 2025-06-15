@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from "react";
 import LoginForm from "../components/LoginForm";
 import LeaderDashboard from "../components/LeaderDashboard";
 import MemberDashboard from "../components/MemberDashboard";
 import ThresholdConfigPanel from "../components/ThresholdConfigPanel";
 import { ThresholdAnalyticsPanel } from "../components/ThresholdAnalyticsPanel";
+import { Button } from "@/components/ui/button";
 
 // -------------------
 // Version 3 constants

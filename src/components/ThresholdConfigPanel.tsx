@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -94,7 +93,7 @@ const ThresholdConfigPanel: React.FC<ThresholdConfigPanelProps> = ({
           <Button type="button" onClick={resetAll} variant="destructive">
             Reset All to Defaults
           </Button>
-          <Button type="button" onClick={onClose} variant="primary">
+          <Button type="button" onClick={onClose} variant="default">
             Close
           </Button>
         </div>
