@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from "react";
 import UserListTable from "./UserListTable";
 import CreditHistoryTable from "./CreditHistoryTable";
 import AddCreditForm from "./AddCreditForm";
+import BulkCreditAddForm from "./BulkCreditAddForm";
 import { Button } from "@/components/ui/button";
-import { LogIn, User, Edit, Info, Users, Search } from "lucide-react";
+import { LogIn, User, Edit, Info, Users, Search, Plus } from "lucide-react";
 import UserProfileModal from "./UserProfileModal";
 
 // user type
@@ -110,6 +110,31 @@ const LeaderDashboard: React.FC<LeaderDashboardProps> = ({
   const [manualDisable, setManualDisable] = useState(false);
   const [reason, setReason] = useState("");
 
+  // Bulk Credit Modal state
+  const [bulkOpen, setBulkOpen] = React.useState(false);
+
+  // Bulk credit handler
+  const handleBulkCreditUpdate = ({
+    userIds,
+    amount,
+    reason,
+    issuer,
+  }: {
+    userIds: string[];
+    amount: number;
+    reason: string;
+    issuer: string;
+  }) => {
+    userIds.forEach((userId) => {
+      onCreditUpdate({
+        userId,
+        amount,
+        reason,
+        issuer,
+      });
+    });
+  };
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-blue-50 to-emerald-50 px-2 py-6">
       <div className="flex flex-col md:flex-row items-center justify-between gap-6 border-b pb-4 mb-8">
@@ -146,9 +171,21 @@ const LeaderDashboard: React.FC<LeaderDashboardProps> = ({
       </div>
 
       <div className="flex gap-3 mb-3 justify-end">
-        <Button onClick={() => setAnalyticsVisible(true)} variant="outline" size="sm">
+        <Button
+          onClick={() => setAnalyticsVisible(true)}
+          variant="outline"
+          size="sm"
+        >
           <Users size={16} className="mr-2" />
           Analytics
+        </Button>
+        <Button
+          onClick={() => setBulkOpen(true)}
+          variant="default"
+          size="sm"
+        >
+          <Plus size={16} className="mr-2" />
+          Bulk Credit Add
         </Button>
       </div>
 
@@ -333,6 +370,14 @@ const LeaderDashboard: React.FC<LeaderDashboardProps> = ({
           </div>
         </div>
       )}
+
+      <BulkCreditAddForm
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        users={users}
+        leader={currentLeader}
+        onBulkCreditUpdate={handleBulkCreditUpdate}
+      />
 
       <UserProfileModal
         open={profileOpen}
