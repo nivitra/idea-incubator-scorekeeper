@@ -506,7 +506,7 @@ const Index = () => {
     const lastAttemptLeader =
       loginMode === "signUp" ? false : undefined;
     return (
-      <div className="min-h-screen flex justify-center items-center bg-gradient-to-tr from-blue-50 to-emerald-100 relative">
+      <div className="min-h-screen flex flex-col bg-gradient-to-tr from-blue-50 to-emerald-100 relative">
         {/* Banner and logo */}
         <img
           src={branding.home_banner_image}
@@ -514,7 +514,7 @@ const Index = () => {
           className="absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none z-0"
           style={{ minHeight: 340, objectPosition: "center" }}
         />
-        <div className="relative z-10 flex flex-col items-center">
+        <div className="relative z-10 flex flex-col items-center flex-1 justify-center">
           <img
             src={branding.club_logo}
             alt={branding.club_name}
@@ -545,35 +545,70 @@ const Index = () => {
             <div className="text-red-500 text-xs mt-2">{loginError}</div>
           )}
         </div>
-        <Footer />
+        <div className="mt-auto">
+          <Footer />
+        </div>
       </div>
     );
   }
 
   // Find user and check approval state
   const user = users.find((u) => u.id === currentUser.id);
-  if (!user) return <div>User not found.<Footer /></div>;
-  if (APPROVAL_REQUIRED && user.approvalState && user.approvalState !== "approved") {
+  if (!user) return (
+    <div className="min-h-screen flex flex-col">
+      <div className="flex-1 flex items-center justify-center">
+        User not found.
+      </div>
+      <div className="mt-auto">
+        <Footer />
+      </div>
+    </div>
+  );
+  if (
+    APPROVAL_REQUIRED &&
+    user.approvalState &&
+    user.approvalState !== "approved"
+  ) {
     // If leader/admin, show approval UI, else pending
     if (currentUser.role === "leader") {
       return (
-        <div className="min-h-screen bg-gradient-to-tr from-blue-50 to-emerald-100 flex flex-col items-center justify-center">
-          <div className="bg-white border shadow rounded-xl p-8 max-w-md">
+        <div className="min-h-screen flex flex-col bg-gradient-to-tr from-blue-50 to-emerald-100">
+          <div className="bg-white border shadow rounded-xl p-8 max-w-md mx-auto mt-12">
             <div className="font-bold mb-2">Pending Member Approvals</div>
-            {users.filter(u => u.approvalState === "pending").length ? (
-              users.filter(u => u.approvalState === "pending").map(u =>
-                <div key={u.id} className="flex items-center gap-3 mb-2 p-2 border-b">
-                  <img src={u.avatarUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(u.email)}`} alt={u.name} className="w-8 h-8 rounded-full" />
-                  <span className="font-semibold">{u.name}</span>
-                  <span className="text-xs text-muted-foreground">{u.position || "N/A"}</span>
-                  <Button size="sm" className="ml-auto" onClick={() => approveUser(u.id)}>
-                    Approve
-                  </Button>
-                  <Button variant="destructive" size="sm" onClick={() => rejectUser(u.id, "Not eligible")}>
-                    Reject
-                  </Button>
-                </div>
-              )
+            {users.filter((u) => u.approvalState === "pending").length ? (
+              users
+                .filter((u) => u.approvalState === "pending")
+                .map((u) => (
+                  <div
+                    key={u.id}
+                    className="flex items-center gap-3 mb-2 p-2 border-b"
+                  >
+                    <img
+                      src={
+                        u.avatarUrl ||
+                        `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(
+                          u.email
+                        )}`
+                      }
+                      alt={u.name}
+                      className="w-8 h-8 rounded-full"
+                    />
+                    <span className="font-semibold">{u.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {u.position || "N/A"}
+                    </span>
+                    <Button size="sm" className="ml-auto" onClick={() => approveUser(u.id)}>
+                      Approve
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => rejectUser(u.id, "Not eligible")}
+                    >
+                      Reject
+                    </Button>
+                  </div>
+                ))
             ) : (
               <div className="text-sm">No users pending approval.</div>
             )}
@@ -617,21 +652,31 @@ const Index = () => {
                   ))
               )}
             </div>
-            <Button className="mt-6 w-full" onClick={handleLogout}>Logout</Button>
+            <Button className="mt-6 w-full" onClick={handleLogout}>
+              Logout
+            </Button>
           </div>
-          <Footer />
+          <div className="mt-auto">
+            <Footer />
+          </div>
         </div>
       );
     }
     // Member in review
     return (
-      <div className="min-h-screen bg-gradient-to-tr from-blue-100 to-emerald-50 flex flex-col items-center justify-center">
-        <div className="bg-white p-8 rounded-xl border shadow text-center max-w-md">
-          <div className="font-bold text-lg mb-3">Your membership is pending approval!</div>
-          <div className="text-muted-foreground mb-4">Please wait for a leader/manager to review your request.</div>
-          <Button className="w-full" onClick={handleLogout}>Logout</Button>
+      <div className="min-h-screen flex flex-col bg-gradient-to-tr from-blue-100 to-emerald-50">
+        <div className="flex flex-1 items-center justify-center">
+          <div className="bg-white p-8 rounded-xl border shadow text-center max-w-md">
+            <div className="font-bold text-lg mb-3">Your membership is pending approval!</div>
+            <div className="text-muted-foreground mb-4">Please wait for a leader/manager to review your request.</div>
+            <Button className="w-full" onClick={handleLogout}>
+              Logout
+            </Button>
+          </div>
         </div>
-        <Footer />
+        <div className="mt-auto">
+          <Footer />
+        </div>
       </div>
     );
   }
@@ -639,23 +684,27 @@ const Index = () => {
   // Member dashboard
   if (user.role === "member") {
     return (
-      <>
-        <MemberDashboard
-          user={user}
-          disabled={user.status !== "active"}
-          minCredits={user.minThreshold !== undefined ? user.minThreshold : globalThreshold}
-          warnBuffer={buffer}
-          globalThreshold={globalThreshold}
-          softDisabled={user.softDisabled}
-          onLogout={handleLogout}
-        />
-        <Footer />
-      </>
+      <div className="min-h-screen flex flex-col">
+        <div className="flex-1 flex flex-col">
+          <MemberDashboard
+            user={user}
+            disabled={user.status !== "active"}
+            minCredits={user.minThreshold !== undefined ? user.minThreshold : globalThreshold}
+            warnBuffer={buffer}
+            globalThreshold={globalThreshold}
+            softDisabled={user.softDisabled}
+            onLogout={handleLogout}
+          />
+        </div>
+        <div className="mt-auto">
+          <Footer />
+        </div>
+      </div>
     );
   }
   // Leader dashboard
   return (
-    <>
+    <div className="min-h-screen flex flex-col">
       <div className="w-full px-2">
         {/* Dynamic club header for leader */}
         <header className="flex items-center gap-3 py-3 mb-4 border-b max-w-6xl mx-auto">
@@ -676,54 +725,64 @@ const Index = () => {
           </span>
         </header>
       </div>
-      <LeaderDashboard
-        users={users}
-        currentLeader={user}
-        minCredits={globalThreshold}
-        buffer={buffer}
-        setBuffer={setBuffer}
-        globalThreshold={globalThreshold}
-        setGlobalThreshold={setGlobalThreshold}
-        onCreditUpdate={handleCreditUpdate}
-        onLogout={handleLogout}
-        setThresholdPanelVisible={setThresholdConfigVisible}
-        setAnalyticsVisible={setShowAnalytics}
-        setUserThreshold={setUserThreshold}
-        resetAllThresholds={resetAllThresholds}
-        handleManualDisable={handleManualDisable}
-        handleManualReactivate={handleManualReactivate}
-      />
-      <ThresholdConfigPanel
-        globalThreshold={globalThreshold}
-        setGlobalThreshold={setGlobalThreshold}
-        buffer={buffer}
-        setBuffer={setBuffer}
-        users={users}
-        setUserThreshold={setUserThreshold}
-        resetAll={resetAllThresholds}
-        visible={thresholdConfigVisible}
-        onClose={() => setThresholdConfigVisible(false)}
-      />
-      <ThresholdAnalyticsPanel
-        visible={showAnalytics}
-        onClose={() => setShowAnalytics(false)}
-        globalThreshold={globalThreshold}
-        buffer={buffer}
-        data={users.map(u => ({
-          id: u.id, name: u.name,
-          credits: u.credits,
-          threshold: u.minThreshold !== undefined ? u.minThreshold : globalThreshold,
-          status: u.status === "disabled" ? "disabled" : u.softDisabled ? "soft-disabled" : "active"
-        }))}
-      />
-      {/* Brand panel (stub, only visible for demo) */}
-      <BrandingAdminPanel />
-      <Footer />
-    </>
+      <div className="flex-1 flex flex-col">
+        <LeaderDashboard
+          users={users}
+          currentLeader={user}
+          minCredits={globalThreshold}
+          buffer={buffer}
+          setBuffer={setBuffer}
+          globalThreshold={globalThreshold}
+          setGlobalThreshold={setGlobalThreshold}
+          onCreditUpdate={handleCreditUpdate}
+          onLogout={handleLogout}
+          setThresholdPanelVisible={setThresholdConfigVisible}
+          setAnalyticsVisible={setShowAnalytics}
+          setUserThreshold={setUserThreshold}
+          resetAllThresholds={resetAllThresholds}
+          handleManualDisable={handleManualDisable}
+          handleManualReactivate={handleManualReactivate}
+        />
+        <ThresholdConfigPanel
+          globalThreshold={globalThreshold}
+          setGlobalThreshold={setGlobalThreshold}
+          buffer={buffer}
+          setBuffer={setBuffer}
+          users={users}
+          setUserThreshold={setUserThreshold}
+          resetAll={resetAllThresholds}
+          visible={thresholdConfigVisible}
+          onClose={() => setThresholdConfigVisible(false)}
+        />
+        <ThresholdAnalyticsPanel
+          visible={showAnalytics}
+          onClose={() => setShowAnalytics(false)}
+          globalThreshold={globalThreshold}
+          buffer={buffer}
+          data={users.map((u) => ({
+            id: u.id,
+            name: u.name,
+            credits: u.credits,
+            threshold: u.minThreshold !== undefined ? u.minThreshold : globalThreshold,
+            status:
+              u.status === "disabled"
+                ? "disabled"
+                : u.softDisabled
+                  ? "soft-disabled"
+                  : "active",
+          }))}
+        />
+        {/* Brand panel (stub, only visible for demo) */}
+        <BrandingAdminPanel />
+      </div>
+      <div className="mt-auto">
+        <Footer />
+      </div>
+    </div>
   );
 };
 
 export default Index;
 
-// NOTE: This file is now quite long (~600 lines).
+// NOTE: This file is now quite long (~700+ lines).
 // ⚡️ Consider refactoring it into smaller files for maintainability!
