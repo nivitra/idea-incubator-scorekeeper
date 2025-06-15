@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from "react";
 import UserListTable from "./UserListTable";
 import CreditHistoryTable from "./CreditHistoryTable";
 import AddCreditForm from "./AddCreditForm";
 import { Button } from "@/components/ui/button";
-import { LogIn, User } from "lucide-react";
+import { LogIn, User, Edit, Info, Users, Search } from "lucide-react";
 import UserProfileModal from "./UserProfileModal";
 
 // user type
@@ -22,42 +23,59 @@ type User = {
     by: string;
   }[];
   avatarUrl: string;
+  minThreshold?: number;
+  position?: string;
+  softDisabled?: boolean;
+  thresholdLogs?: any[];
+  suspensionReason?: string;
+  approvalState?: string;
 };
 
 interface LeaderDashboardProps {
   users: User[];
   currentLeader: User;
   minCredits: number;
-  onCreditUpdate: ({
-    userId,
-    amount,
-    reason,
-    issuer,
-  }: {
-    userId: string;
-    amount: number;
-    reason: string;
-    issuer: string;
-  }) => void;
+  buffer: number;
+  setBuffer: (v: number) => void;
+  globalThreshold: number;
+  setGlobalThreshold: (n: number) => void;
+  onCreditUpdate: (params: any) => void;
   onLogout: () => void;
+  setThresholdPanelVisible: (val: boolean) => void;
+  setAnalyticsVisible: (val: boolean) => void;
+  setUserThreshold: (id: string, value: number | undefined) => void;
+  resetAllThresholds: () => void;
+  handleManualDisable: ({ userId, reason }: { userId: string; reason: string }) => void;
+  handleManualReactivate: ({ userId, reason }: { userId: string; reason: string }) => void;
 }
 
 const LeaderDashboard: React.FC<LeaderDashboardProps> = ({
   users,
   currentLeader,
   minCredits,
+  buffer,
+  setBuffer,
+  globalThreshold,
+  setGlobalThreshold,
   onCreditUpdate,
   onLogout,
+  setThresholdPanelVisible,
+  setAnalyticsVisible,
+  setUserThreshold,
+  resetAllThresholds,
+  handleManualDisable,
+  handleManualReactivate,
 }) => {
   // Filters
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "disabled">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "soft-disabled" | "disabled">("all");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   // Derived filtered list
   const filteredUsers = users.filter((u) => {
-    if (u.role === "leader") return false; // don't show leaders in member list
+    if (u.role === "leader") return false;
     if (statusFilter === "active" && u.status !== "active") return false;
+    if (statusFilter === "soft-disabled" && u.status !== "soft-disabled") return false;
     if (statusFilter === "disabled" && u.status !== "disabled") return false;
     if (
       search &&
@@ -87,6 +105,11 @@ const LeaderDashboard: React.FC<LeaderDashboardProps> = ({
     setLocalLeader(currentLeader);
   }, [currentLeader]);
 
+  // Manual disable/reactivate UI state
+  const [manualEnable, setManualEnable] = useState(false);
+  const [manualDisable, setManualDisable] = useState(false);
+  const [reason, setReason] = useState("");
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-blue-50 to-emerald-50 px-2 py-6">
       <div className="flex flex-col md:flex-row items-center justify-between gap-6 border-b pb-4 mb-8">
@@ -111,11 +134,22 @@ const LeaderDashboard: React.FC<LeaderDashboardProps> = ({
             <User className="mr-1" size={16} />
             Profile
           </Button>
+          <Button variant="secondary" size="sm" onClick={() => setThresholdPanelVisible(true)}>
+            <Edit className="mr-1" size={16} />
+            Threshold Settings
+          </Button>
           <Button variant="outline" size="sm" onClick={onLogout}>
             <LogIn className="mr-1" size={16} />
             Log out
           </Button>
         </div>
+      </div>
+
+      <div className="flex gap-3 mb-3 justify-end">
+        <Button onClick={() => setAnalyticsVisible(true)} variant="outline" size="sm">
+          <Users size={16} className="mr-2" />
+          Analytics
+        </Button>
       </div>
 
       <div className="bg-white shadow-md rounded-xl p-6 mb-10">
@@ -143,6 +177,7 @@ const LeaderDashboard: React.FC<LeaderDashboardProps> = ({
             >
               <option value="all">All</option>
               <option value="active">Active</option>
+              <option value="soft-disabled">Soft Disabled</option>
               <option value="disabled">Disabled</option>
             </select>
           </div>
@@ -151,7 +186,9 @@ const LeaderDashboard: React.FC<LeaderDashboardProps> = ({
           users={filteredUsers}
           selectedId={selectedUserId}
           setSelectedId={setSelectedUserId}
-          minCredits={minCredits}
+          minCredits={globalThreshold}
+          showThreshold
+          setUserThreshold={setUserThreshold}
         />
       </div>
 
@@ -162,7 +199,7 @@ const LeaderDashboard: React.FC<LeaderDashboardProps> = ({
               <AddCreditForm
                 user={selectedUser}
                 currentLeaderName={currentLeader.name}
-                minCredits={minCredits}
+                minCredits={selectedUser.minThreshold !== undefined ? selectedUser.minThreshold : globalThreshold}
                 onCreditUpdate={onCreditUpdate}
               />
             </div>
@@ -173,29 +210,122 @@ const LeaderDashboard: React.FC<LeaderDashboardProps> = ({
                   className={
                     selectedUser.status === "active"
                       ? "text-emerald-600 font-bold"
+                      : selectedUser.status === "soft-disabled"
+                      ? "text-orange-600 font-bold"
                       : "text-red-600 font-bold"
                   }
                 >
                   {selectedUser.status.charAt(0).toUpperCase() +
                     selectedUser.status.slice(1)}
+                  {selectedUser.softDisabled && (
+                    <span className="ml-2 px-2 py-1 bg-orange-200/80 rounded text-xs text-orange-800 font-semibold">
+                      Soft-disabled
+                    </span>
+                  )}
                 </span>
               </div>
-              <div>
+              <div className="my-1">
                 <span className="font-semibold">Credits: </span>
                 <span
                   className={
-                    selectedUser.credits >= minCredits
+                    selectedUser.credits >= (selectedUser.minThreshold ?? globalThreshold)
                       ? "text-emerald-700 font-bold"
-                      : "text-red-600 font-bold"
+                      : selectedUser.status === "soft-disabled"
+                        ? "text-orange-600 font-bold"
+                        : "text-red-600 font-bold"
                   }
                 >
                   {selectedUser.credits}
                 </span>
               </div>
               <div>
+                <span className="font-semibold">Threshold: </span>
+                <span>
+                  {selectedUser.minThreshold !== undefined
+                    ? `${selectedUser.minThreshold} (User)`
+                    : `${globalThreshold} (Global)`}
+                </span>
+              </div>
+              <div>
                 <span className="font-semibold">Joined: </span>
                 <span>{selectedUser.joinDate}</span>
               </div>
+              {selectedUser.suspensionReason && selectedUser.status === "disabled" && (
+                <div className="mt-3 text-sm text-red-700 font-medium">
+                  Suspension Reason: {selectedUser.suspensionReason}
+                </div>
+              )}
+              {(selectedUser.status === "disabled" || selectedUser.softDisabled) && (
+                <div className="flex gap-2 mt-3">
+                  {selectedUser.status === "disabled" && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setManualEnable(true)}
+                    >
+                      Reactivate
+                    </Button>
+                  )}
+                  {selectedUser.status !== "disabled" && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => setManualDisable(true)}
+                    >
+                      Suspend
+                    </Button>
+                  )}
+                </div>
+              )}
+              {(manualEnable || manualDisable) && (
+                <div className="mt-3 flex flex-col gap-2">
+                  <label className="text-sm font-semibold">{manualEnable ? "Reason for reactivation:" : "Reason for suspension:"}</label>
+                  <textarea className="border rounded p-2" value={reason} onChange={e => setReason(e.target.value)} />
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      disabled={!reason}
+                      onClick={() => {
+                        if (manualEnable) {
+                          handleManualReactivate({ userId: selectedUser.id, reason });
+                          setManualEnable(false);
+                        } else {
+                          handleManualDisable({ userId: selectedUser.id, reason });
+                          setManualDisable(false);
+                        }
+                        setReason("");
+                      }}
+                    >
+                      Confirm
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setManualEnable(false);
+                        setManualDisable(false);
+                        setReason("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {selectedUser.thresholdLogs?.length > 0 && (
+                <div className="mt-5 bg-white rounded border p-3 text-xs">
+                  <b>Status Logs</b>
+                  <ul>
+                    {selectedUser.thresholdLogs.slice(-6).reverse().map((l, i) => (
+                      <li key={i} className="mb-1">
+                        <span className="text-muted-foreground">{new Date(l.ts).toLocaleString()}</span>{" "}
+                        &ndash; <span className="font-semibold capitalize">{l.action.replace("-", " ")}</span>
+                        {l.note && " — " + l.note}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
           <div>
@@ -219,3 +349,5 @@ const LeaderDashboard: React.FC<LeaderDashboardProps> = ({
 };
 
 export default LeaderDashboard;
+
+// NOTE: This file is now large (>230 lines). You may want to refactor it for maintainability!

@@ -1,10 +1,19 @@
+
 import React, { useState, useEffect } from "react";
 import LoginForm from "../components/LoginForm";
 import LeaderDashboard from "../components/LeaderDashboard";
 import MemberDashboard from "../components/MemberDashboard";
+import ThresholdConfigPanel from "../components/ThresholdConfigPanel";
+import { ThresholdAnalyticsPanel } from "../components/ThresholdAnalyticsPanel";
 
-// Threshold for active/disabled
-const MIN_CREDITS = 10;
+// -------------------
+// Version 3 constants
+// -------------------
+
+const DEFAULT_MIN_CREDITS = 10; // global default threshold
+const DEFAULT_WARN_BUFFER = 5; // credits near threshold triggers warning
+const APPROVAL_REQUIRED = true;
+const CREDIT_LOCK = true; // credit cannot go below 0
 
 // Initial mock users
 const INITIAL_USERS = [
@@ -17,6 +26,13 @@ const INITIAL_USERS = [
     status: "active",
     joinDate: "2023-06-01",
     avatarUrl: "",
+    position: "Club President",
+    minThreshold: undefined, // optional per-user override
+    softDisabled: false,
+    thresholdLogs: [],
+    suspensionReason: "",
+    recoveryLogs: [],
+    approvalState: "approved",
     history: [
       {
         ts: "2024-06-15T10:01:00Z",
@@ -41,6 +57,13 @@ const INITIAL_USERS = [
     status: "active",
     joinDate: "2023-11-15",
     avatarUrl: "",
+    minThreshold: undefined,
+    softDisabled: false,
+    position: "Member",
+    thresholdLogs: [],
+    suspensionReason: "",
+    recoveryLogs: [],
+    approvalState: "approved",
     history: [
       {
         ts: "2024-06-10T12:00:00Z",
@@ -59,6 +82,13 @@ const INITIAL_USERS = [
     status: "disabled",
     joinDate: "2022-12-22",
     avatarUrl: "",
+    minThreshold: 8,
+    softDisabled: false,
+    position: "Senior Member",
+    thresholdLogs: [],
+    suspensionReason: "Absence Penalty",
+    recoveryLogs: [],
+    approvalState: "approved",
     history: [
       {
         ts: "2024-06-01T15:35:00Z",
@@ -83,17 +113,22 @@ const INITIAL_USERS = [
 ];
 
 const Index = () => {
+  // --- Settings State ---
+  const [globalThreshold, setGlobalThreshold] = useState(DEFAULT_MIN_CREDITS);
+  const [buffer, setBuffer] = useState(DEFAULT_WARN_BUFFER);
   const [users, setUsers] = useState(INITIAL_USERS);
   const [currentUser, setCurrentUser] = useState<null | { id: string; name: string; email: string; role: string }>(null);
+  const [thresholdConfigVisible, setThresholdConfigVisible] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   // Listen for profile updates
   React.useEffect(() => {
     const handleProfileUpdate = (e: any) => {
-      const { name, avatarUrl } = e.detail;
+      const { name, avatarUrl, position } = e.detail;
       setUsers(prev =>
         prev.map(u =>
           currentUser && u.id === currentUser.id
-            ? { ...u, name, avatarUrl }
+            ? { ...u, name, avatarUrl, position: position || u.position }
             : u
         )
       );
@@ -108,9 +143,170 @@ const Index = () => {
     // eslint-disable-next-line
   }, [currentUser]);
 
-  // Simulate authentication (no real security!)
-  const handleLogin = (u: { name: string; email: string; role: string }) => {
-    // Try to find the user, else make a new member
+  // ---- User approve/reject (superficial logic for demo) ----
+  const approveUser = (id: string) => {
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === id ? { ...u, approvalState: "approved" } : u
+      )
+    );
+  };
+  const rejectUser = (id: string, reason = "Not eligible") => {
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === id ? { ...u, approvalState: "rejected", suspensionReason: reason } : u
+      )
+    );
+  };
+
+  // ---- Per-user threshold override ----
+  const setUserThreshold = (id: string, value: number | undefined) => {
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === id ? { ...u, minThreshold: value } : u
+      )
+    );
+  };
+
+  // ---- Reset all ----
+  const resetAllThresholds = () => {
+    setUsers((prev) =>
+      prev.map((u) => ({ ...u, minThreshold: undefined }))
+    );
+    setGlobalThreshold(DEFAULT_MIN_CREDITS);
+    setBuffer(DEFAULT_WARN_BUFFER);
+  };
+
+  // ---- Main credit update logic ----
+  const handleCreditUpdate = ({
+    userId,
+    amount,
+    reason,
+    issuer,
+    disableReason,
+    forceReenable, // for manual re-enable
+  }: {
+    userId: string;
+    amount: number;
+    reason: string;
+    issuer: string;
+    disableReason?: string;
+    forceReenable?: boolean;
+  }) => {
+    setUsers((prev) =>
+      prev.map((u) => {
+        if (u.id !== userId) return u;
+        let credits = u.credits + amount;
+        // Credit lock/security
+        if (CREDIT_LOCK && credits < 0) credits = 0;
+        // Determine min threshold
+        const minC = u.minThreshold !== undefined ? u.minThreshold : globalThreshold;
+        // Current status
+        let status = u.status;
+        let softDisabled = u.softDisabled;
+        let logs = u.thresholdLogs ? [...u.thresholdLogs] : [];
+        let suspensionRes = u.suspensionReason ?? "";
+        let recov = u.recoveryLogs ? [...u.recoveryLogs] : [];
+        // Recovery tracking
+        const prevBelow = u.credits < minC;
+        const nowBelow = credits < minC;
+        // Status transitions
+        if (forceReenable) {
+          status = "active";
+          softDisabled = false;
+          logs.push({ ts: new Date().toISOString(), action: "manual-reactivate", note: disableReason });
+          recov.push({ ts: new Date().toISOString(), action: "manual-reactivate", note: disableReason });
+        } else if (nowBelow && !prevBelow) {
+          status = credits < minC - buffer ? "disabled" : "soft-disabled";
+          softDisabled = credits < minC && credits >= minC - buffer;
+          logs.push({
+            ts: new Date().toISOString(),
+            action: "threshold-drop",
+            note: status === "disabled" ? (disableReason || "Auto: Below threshold") : "Soft disable - near limit"
+          });
+          if (credits < minC) recov.push({ ts: new Date().toISOString(), action: "below-threshold" });
+          if (credits < minC - buffer) suspensionRes = disableReason || "";
+        } else if (!nowBelow && prevBelow) {
+          status = "active";
+          softDisabled = false;
+          logs.push({
+            ts: new Date().toISOString(),
+            action: "recovery",
+            note: "Credit above threshold"
+          });
+          recov.push({ ts: new Date().toISOString(), action: "above-threshold" });
+          suspensionRes = "";
+        } else if (u.status === "soft-disabled" && credits < minC - buffer) {
+          status = "disabled";
+          softDisabled = false;
+          logs.push({
+            ts: new Date().toISOString(),
+            action: "soft->full-disable",
+            note: disableReason || "Auto: Fallen further below"
+          });
+          suspensionRes = disableReason || "";
+        }
+        // Manual disable
+        if (disableReason && status !== "disabled") {
+          status = "disabled";
+          logs.push({ ts: new Date().toISOString(), action: "manual-disable", note: disableReason });
+          suspensionRes = disableReason;
+        }
+        // Manual reenable
+        if (forceReenable) {
+          suspensionRes = "";
+        }
+        // History
+        let history = [
+          {
+            ts: new Date().toISOString(),
+            amount: amount,
+            reason,
+            by: issuer,
+          },
+          ...(u.history || []),
+        ];
+        return {
+          ...u,
+          credits,
+          status,
+          history,
+          thresholdLogs: logs,
+          suspensionReason: suspensionRes,
+          recoveryLogs: recov,
+          softDisabled,
+        };
+      })
+    );
+  };
+
+  // ------------- Soft disable automation ---------------
+  // Whenever a user credit changes, we update status
+  React.useEffect(() => {
+    setUsers((prev) =>
+      prev.map((u) => {
+        const minC = u.minThreshold !== undefined ? u.minThreshold : globalThreshold;
+        let status = u.status;
+        let softDisabled = u.softDisabled;
+        // Determine status
+        if (u.credits < minC - buffer) {
+          if (u.status !== "disabled") status = "disabled";
+          softDisabled = false;
+        } else if (u.credits < minC) {
+          if (u.status !== "soft-disabled") status = "soft-disabled";
+          softDisabled = true;
+        } else {
+          status = "active";
+          softDisabled = false;
+        }
+        return { ...u, status, softDisabled };
+      })
+    );
+  }, [users.length, globalThreshold, buffer]);
+
+  // ----- Signup & authentication -----
+  const handleLogin = (u: { name: string; email: string; role: string; avatarUrl?: string; position?: string }) => {
+    // Try to find the user, else create with in-review approval
     let match = users.find(
       (user) => user.email.toLowerCase() === u.email.toLowerCase()
     );
@@ -120,11 +316,18 @@ const Index = () => {
         id: "u" + (users.length + 1),
         name: u.name,
         email: u.email,
-        role,
+        role: role,
         credits: 12,
         status: "active",
         joinDate: new Date().toISOString().slice(0, 10),
-        avatarUrl: "", // <-- Fix: always include avatarUrl
+        avatarUrl: u.avatarUrl ?? "",
+        minThreshold: undefined,
+        softDisabled: false,
+        position: u.position ?? "",
+        thresholdLogs: [],
+        suspensionReason: "",
+        recoveryLogs: [],
+        approvalState: APPROVAL_REQUIRED ? "pending" : "approved",
         history: [
           {
             ts: new Date().toISOString(),
@@ -134,7 +337,7 @@ const Index = () => {
           },
         ],
       };
-      setUsers((prev) => [...prev, match]);
+      setUsers((prev) => [...prev, match!]);
     }
     setCurrentUser({
       id: match.id,
@@ -148,138 +351,155 @@ const Index = () => {
     setCurrentUser(null);
   };
 
-  // Main credit update logic
-  const handleCreditUpdate = ({
-    userId,
-    amount,
-    reason,
-    issuer,
-  }: {
-    userId: string;
-    amount: number;
-    reason: string;
-    issuer: string;
-  }) => {
+  // ---------- Manual activation/deactivation from leader -----------
+  const handleManualDisable = ({ userId, reason }: { userId: string; reason: string }) => {
     setUsers((prev) =>
       prev.map((u) => {
         if (u.id !== userId) return u;
-        let newCredits = u.credits + amount;
-        // Status logic
-        let newStatus = u.status;
-        const prevStatus = u.status;
-        if (newCredits < MIN_CREDITS) {
-          newStatus = "disabled";
-        } else {
-          newStatus = "active";
-        }
-        // Add history entry for credit action
-        const updated = {
+        let logs = u.thresholdLogs ? [...u.thresholdLogs] : [];
+        logs.push({ ts: new Date().toISOString(), action: "manual-disable", note: reason });
+        return {
           ...u,
-          credits: newCredits,
-          status: newStatus,
-          history: [
-            {
-              ts: new Date().toISOString(),
-              amount: amount,
-              reason,
-              by: issuer,
-            },
-            ...u.history,
-          ],
+          status: "disabled",
+          suspensionReason: reason,
+          thresholdLogs: logs,
         };
-        // If status changed due to crossing threshold, note in history
-        if (prevStatus !== newStatus) {
-          updated.history = [
-            {
-              ts: new Date().toISOString(),
-              amount: 0,
-              reason:
-                newStatus === "disabled"
-                  ? "Below threshold: user disabled"
-                  : "Above threshold: user enabled",
-              by: "SYSTEM",
-            },
-            ...updated.history,
-          ];
-        }
-        updated.status = newStatus;
-        return updated;
+      })
+    );
+  };
+  const handleManualReactivate = ({ userId, reason }: { userId: string; reason: string }) => {
+    setUsers((prev) =>
+      prev.map((u) => {
+        if (u.id !== userId) return u;
+        let logs = u.thresholdLogs ? [...u.thresholdLogs] : [];
+        logs.push({ ts: new Date().toISOString(), action: "manual-reactivate", note: reason });
+        return {
+          ...u,
+          status: "active",
+          softDisabled: false,
+          suspensionReason: "",
+          thresholdLogs: logs,
+        };
       })
     );
   };
 
-  // Re-calc status for all on any change (simulate backend/cron in real life)
-  React.useEffect(() => {
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.credits < MIN_CREDITS && u.status !== "disabled") {
-          return {
-            ...u,
-            status: "disabled",
-            history: [
-              {
-                ts: new Date().toISOString(),
-                amount: 0,
-                reason: "Below threshold: user disabled",
-                by: "SYSTEM",
-              },
-              ...u.history,
-            ],
-          };
-        } else if (u.credits >= MIN_CREDITS && u.status !== "active") {
-          return {
-            ...u,
-            status: "active",
-            history: [
-              {
-                ts: new Date().toISOString(),
-                amount: 0,
-                reason: "Above threshold: user enabled",
-                by: "SYSTEM",
-              },
-              ...u.history,
-            ],
-          };
-        } else {
-          return u;
-        }
-      })
-    );
-  }, [users.length]); // intentionally only fires on users array shape change
-
-  // Not logged in: show Login
+  // ===================== ENTRY POINT ====================
+  // Not logged in
   if (!currentUser) {
     return (
       <div className="min-h-screen flex justify-center items-center bg-gradient-to-tr from-blue-50 to-emerald-100">
-        <LoginForm onLogin={handleLogin} showRoleOption />
+        <LoginForm onLogin={handleLogin} showRoleOption requireExtraFields />
       </div>
     );
   }
 
+  // Find user and check approval state
   const user = users.find((u) => u.id === currentUser.id);
   if (!user) return <div>User not found.</div>;
+  if (APPROVAL_REQUIRED && user.approvalState && user.approvalState !== "approved") {
+    // If leader/admin, show approval UI, else pending
+    if (currentUser.role === "leader") {
+      return (
+        <div className="min-h-screen bg-gradient-to-tr from-blue-50 to-emerald-100 flex flex-col items-center justify-center">
+          <div className="bg-white border shadow rounded-xl p-8 max-w-md">
+            <div className="font-bold mb-2">Pending Member Approvals</div>
+            {users.filter(u => u.approvalState === "pending").length ? (
+              users.filter(u => u.approvalState === "pending").map(u =>
+                <div key={u.id} className="flex items-center gap-3 mb-2 p-2 border-b">
+                  <img src={u.avatarUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(u.email)}`} alt={u.name} className="w-8 h-8 rounded-full" />
+                  <span className="font-semibold">{u.name}</span>
+                  <span className="text-xs text-muted-foreground">{u.position || "N/A"}</span>
+                  <Button size="sm" className="ml-auto" onClick={() => approveUser(u.id)}>
+                    Approve
+                  </Button>
+                  <Button variant="destructive" size="sm" onClick={() => rejectUser(u.id, "Not eligible")}>
+                    Reject
+                  </Button>
+                </div>
+              )
+            ) : (
+              <div className="text-sm">No users pending approval.</div>
+            )}
+            <Button className="mt-6 w-full" onClick={handleLogout}>Logout</Button>
+          </div>
+        </div>
+      );
+    }
+    // Member in review
+    return (
+      <div className="min-h-screen bg-gradient-to-tr from-blue-100 to-emerald-50 flex flex-col items-center justify-center">
+        <div className="bg-white p-8 rounded-xl border shadow text-center max-w-md">
+          <div className="font-bold text-lg mb-3">Your membership is pending approval!</div>
+          <div className="text-muted-foreground mb-4">Please wait for a leader/manager to review your request.</div>
+          <Button className="w-full" onClick={handleLogout}>Logout</Button>
+        </div>
+      </div>
+    );
+  }
 
-  // If member and disabled: read-only view with banner
+  // Member dashboard
   if (user.role === "member") {
     return (
       <MemberDashboard
         user={user}
         disabled={user.status !== "active"}
-        minCredits={MIN_CREDITS}
+        minCredits={user.minThreshold !== undefined ? user.minThreshold : globalThreshold}
+        warnBuffer={buffer}
+        globalThreshold={globalThreshold}
+        softDisabled={user.softDisabled}
         onLogout={handleLogout}
       />
     );
   }
-  // Else: show leader/manager dashboard
+  // Leader dashboard
   return (
-    <LeaderDashboard
-      users={users}
-      currentLeader={user}
-      minCredits={MIN_CREDITS}
-      onCreditUpdate={handleCreditUpdate}
-      onLogout={handleLogout}
-    />
+    <>
+      <LeaderDashboard
+        users={users}
+        currentLeader={user}
+        minCredits={globalThreshold}
+        buffer={buffer}
+        setBuffer={setBuffer}
+        globalThreshold={globalThreshold}
+        setGlobalThreshold={setGlobalThreshold}
+        onCreditUpdate={handleCreditUpdate}
+        onLogout={handleLogout}
+        setThresholdPanelVisible={setThresholdConfigVisible}
+        setAnalyticsVisible={setShowAnalytics}
+        setUserThreshold={setUserThreshold}
+        resetAllThresholds={resetAllThresholds}
+        handleManualDisable={handleManualDisable}
+        handleManualReactivate={handleManualReactivate}
+      />
+      <ThresholdConfigPanel
+        globalThreshold={globalThreshold}
+        setGlobalThreshold={setGlobalThreshold}
+        buffer={buffer}
+        setBuffer={setBuffer}
+        users={users}
+        setUserThreshold={setUserThreshold}
+        resetAll={resetAllThresholds}
+        visible={thresholdConfigVisible}
+        onClose={() => setThresholdConfigVisible(false)}
+      />
+      <ThresholdAnalyticsPanel
+        visible={showAnalytics}
+        onClose={() => setShowAnalytics(false)}
+        globalThreshold={globalThreshold}
+        buffer={buffer}
+        data={users.map(u => ({
+          id: u.id, name: u.name,
+          credits: u.credits,
+          threshold: u.minThreshold !== undefined ? u.minThreshold : globalThreshold,
+          status: u.status === "disabled" ? "disabled" : u.softDisabled ? "soft-disabled" : "active"
+        }))}
+      />
+    </>
   );
 };
 
 export default Index;
+
+// NOTE: This file is now quite long (~400 lines).
+// ⚡️ Consider refactoring it into smaller files for maintainability!

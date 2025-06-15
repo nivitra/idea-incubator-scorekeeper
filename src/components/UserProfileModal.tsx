@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Image } from "lucide-react";
@@ -14,25 +14,28 @@ interface UserProfileModalProps {
     name: string;
     email: string;
     avatarUrl?: string;
+    position?: string;
   };
-  onUpdate: (updated: { name: string; avatarUrl?: string }) => void;
+  onUpdate: (updated: { name: string; avatarUrl?: string; position?: string }) => void;
 }
 
 const UserProfileModal: React.FC<UserProfileModalProps> = ({ open, onClose, user, onUpdate }) => {
   const [name, setName] = useState(user.name || "");
   const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl || "");
+  const [position, setPosition] = useState(user.position || "");
   const [saving, setSaving] = useState(false);
 
   React.useEffect(() => {
     setName(user.name || "");
     setAvatarUrl(user.avatarUrl || "");
+    setPosition(user.position || "");
   }, [user]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setTimeout(() => {
-      onUpdate({ name: name.trim() || "Student", avatarUrl: avatarUrl.trim() });
+      onUpdate({ name: name.trim() || "Student", avatarUrl: avatarUrl.trim(), position: position.trim() });
       setSaving(false);
       onClose();
     }, 350);
@@ -43,6 +46,9 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ open, onClose, user
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Edit Profile</DialogTitle>
+          <DialogDescription>
+            Update your visible profile details.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex flex-col gap-2 items-center">
@@ -80,6 +86,17 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ open, onClose, user
               onChange={e => setName(e.target.value)}
               maxLength={60}
               required
+              disabled={saving}
+            />
+          </div>
+          <div>
+            <Label htmlFor="position-input">Position/Title</Label>
+            <Input
+              id="position-input"
+              placeholder="e.g. President, Member"
+              value={position}
+              onChange={e => setPosition(e.target.value)}
+              maxLength={60}
               disabled={saving}
             />
           </div>
