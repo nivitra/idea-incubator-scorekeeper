@@ -1,11 +1,11 @@
+
 import React from "react";
 import CreditHistoryTable from "./CreditHistoryTable";
 import { Button } from "@/components/ui/button";
-import { LogIn } from "lucide-react";
+import { LogIn, User } from "lucide-react";
 import UserProfileModal from "./UserProfileModal";
-import { user as UserIcon } from "lucide-react";
 
-type User = {
+type UserType = {
   id: string;
   name: string;
   email: string;
@@ -23,7 +23,7 @@ type User = {
 };
 
 interface MemberDashboardProps {
-  user: User;
+  user: UserType;
   disabled: boolean;
   minCredits: number;
   onLogout: () => void;
@@ -58,7 +58,7 @@ const MemberDashboard: React.FC<MemberDashboardProps> = ({ user, disabled, minCr
             className="mb-3"
             onClick={() => setProfileOpen(true)}
           >
-            <UserIcon className="mr-1" size={16} />
+            <User className="mr-1" size={16} />
             Profile
           </Button>
           <Button variant="outline" size="sm" className="mb-3" onClick={onLogout}>

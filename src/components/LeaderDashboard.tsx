@@ -3,9 +3,8 @@ import UserListTable from "./UserListTable";
 import CreditHistoryTable from "./CreditHistoryTable";
 import AddCreditForm from "./AddCreditForm";
 import { Button } from "@/components/ui/button";
-import { LogIn } from "lucide-react";
+import { LogIn, User } from "lucide-react";
 import UserProfileModal from "./UserProfileModal";
-import { user as UserIcon } from "lucide-react";
 
 // user type
 type User = {
@@ -109,7 +108,7 @@ const LeaderDashboard: React.FC<LeaderDashboardProps> = ({
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" size="sm" onClick={() => setProfileOpen(true)}>
-            <UserIcon className="mr-1" size={16} />
+            <User className="mr-1" size={16} />
             Profile
           </Button>
           <Button variant="outline" size="sm" onClick={onLogout}>

@@ -3,7 +3,8 @@ import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { user as UserIcon, image as ImageIcon } from "lucide-react";
+import { Image } from "lucide-react";
+import { Label } from "@/components/ui/label";
 
 interface UserProfileModalProps {
   open: boolean;
@@ -56,7 +57,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ open, onClose, user
                 className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 cursor-pointer"
                 title="Change avatar url"
                 style={{ lineHeight: 0 }}>
-                <ImageIcon size={16} />
+                <Image size={16} />
               </label>
             </div>
             <Input
@@ -70,21 +71,27 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ open, onClose, user
               disabled={saving}
             />
           </div>
-          <Input
-            label="Name"
-            placeholder="Your Name"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            maxLength={60}
-            required
-            disabled={saving}
-          />
-          <Input
-            label="Email"
-            value={user.email}
-            disabled
-            className="bg-gray-100"
-          />
+          <div>
+            <Label htmlFor="name-input">Name</Label>
+            <Input
+              id="name-input"
+              placeholder="Your Name"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              maxLength={60}
+              required
+              disabled={saving}
+            />
+          </div>
+          <div>
+            <Label htmlFor="email-input">Email</Label>
+            <Input
+              id="email-input"
+              value={user.email}
+              disabled
+              className="bg-gray-100"
+            />
+          </div>
           <DialogFooter className="gap-2 justify-end">
             <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
               Cancel

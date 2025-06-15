@@ -16,6 +16,7 @@ const INITIAL_USERS = [
     credits: 25,
     status: "active",
     joinDate: "2023-06-01",
+    avatarUrl: "",
     history: [
       {
         ts: "2024-06-15T10:01:00Z",
@@ -39,6 +40,7 @@ const INITIAL_USERS = [
     credits: 12,
     status: "active",
     joinDate: "2023-11-15",
+    avatarUrl: "",
     history: [
       {
         ts: "2024-06-10T12:00:00Z",
@@ -56,6 +58,7 @@ const INITIAL_USERS = [
     credits: 5,
     status: "disabled",
     joinDate: "2022-12-22",
+    avatarUrl: "",
     history: [
       {
         ts: "2024-06-01T15:35:00Z",
