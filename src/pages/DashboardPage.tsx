@@ -13,8 +13,8 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import BadgeDisplay from "@/components/BadgeDisplay";
-import { getUserBadges } from "@/lib/badges";
+import { BadgeDisplay } from "@/components/BadgeDisplay";
+import { calculateBadges, BadgeId } from "@/lib/badges";
 
 export default function DashboardPage() {
   const { currentUser, globalThreshold, warnBuffer } = useApp();
@@ -61,16 +61,11 @@ export default function DashboardPage() {
   const recentTotal = recentTransactions.reduce((sum, t) => sum + t.amount, 0);
 
   // Get earned badges
-  const earnedBadges = getUserBadges({
-    ...currentUser,
-    totalCredits: credits,
-    recoveryCount: currentUser.history.filter(h => h.reason.includes("Recovery")).length,
-    activityDays: 30,
-    topRank: false,
-    referralCount: 0,
-    eventCount: currentUser.history.filter(h => h.reason.toLowerCase().includes("event")).length,
-    streakDays: 7,
-    perfectMonth: false,
+  const earnedBadges = calculateBadges({
+    credits,
+    history: currentUser.history,
+    joinDate: currentUser.joinDate,
+    status: currentUser.status,
   });
 
   return (
